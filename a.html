@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Search & Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .comment-level-0 { margin-left: 0; }
+        .comment-level-1 { margin-left: 1rem; border-left: 2px solid #e5e7eb; padding-left: 0.75rem;}
+        .comment-level-2 { margin-left: 2rem; border-left: 2px solid #e5e7eb; padding-left: 0.75rem;}
+        .comment-level-3 { margin-left: 3rem; border-left: 2px solid #e5e7eb; padding-left: 0.75rem;}
+        .comment-level-4 { margin-left: 4rem; border-left: 2px solid #e5e7eb; padding-left: 0.75rem;}
+        .comment-level-5 { margin-left: 5rem; border-left: 2px solid #e5e7eb; padding-left: 0.75rem;}
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Style for search result items */
+        .search-result-item {
+            transition: background-color 0.2s ease-in-out;
+        }
+        .search-result-item:hover {
+            background-color: #f9fafb; /* Lighter gray on hover */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fab fa-reddit text-3xl text-orange-500"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Reddit Search & Explorer</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="https://github.com/yourusername" target="_blank" class="text-gray-600 hover:text-gray-800" title="GitHub Repository (Replace with actual link)">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            <p class="text-gray-600 mt-2">Search for Reddit threads or extract a specific thread by URL</p>
+        </header>
+
+        <main>
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8 fade-in">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Search Reddit Threads or Enter URL</h2>
+                <form id="searchForm" class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-grow">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Enter search terms (e.g., 'best programming advice') or a full Reddit thread URL"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                            required
+                        >
+                    </div>
+                    <button
+                        type="submit"
+                        id="searchButton"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center justify-center transition-colors w-full md:w-auto"
+                    >
+                        <span id="buttonText">Search / Extract</span>
+                        <div id="buttonLoader" class="loader ml-2 hidden"></div>
+                    </button>
+                </form>
+                <div class="mt-4 text-sm text-gray-500">
+                    <p>Example Search: <code class="bg-gray-200 px-1 rounded">funny cat videos</code></p>
+                    <p>Example URL: <code class="bg-gray-200 px-1 rounded">https://www.reddit.com/r/AskReddit/comments/12345/example_thread/</code></p>
+                </div>
+            </div>
+
+             <div id="searchResultsSection" class="hidden fade-in">
+                 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                     <h2 class="text-xl font-semibold text-gray-800 mb-4">Search Results</h2>
+                     <div id="searchResultsList" class="space-y-4">
+                         <div class="text-center py-8 text-gray-500">Loading search results...</div>
+                     </div>
+                 </div>
+             </div>
+
+            <div id="threadDetailsSection" class="hidden fade-in">
+                 <button id="backToSearchButton" class="mb-4 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i> Back to Search Results
+                </button>
+                <div id="threadInfo" class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex items-start space-x-4">
+                        <div id="threadThumbnail" class="flex-shrink-0 w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                            <i class="fas fa-image text-gray-400 text-xl"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start flex-wrap gap-2">
+                                <h2 id="threadTitle" class="text-xl font-bold text-gray-800 mb-1 flex-grow">Loading...</h2>
+                                <button
+                                    id="exportJsonButton"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded-lg text-sm font-medium flex items-center transition-colors whitespace-nowrap"
+                                >
+                                    <i class="fas fa-file-export mr-2"></i> Export JSON
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 mb-2">
+                                <span id="threadAuthor" class="flex items-center"><i class="fas fa-user mr-1"></i> Loading...</span>
+                                <span id="threadSubreddit" class="flex items-center"><i class="fas fa-users mr-1"></i> Loading...</span>
+                                <span id="threadScore" class="flex items-center"><i class="fas fa-arrow-up mr-1"></i> Loading...</span>
+                                <span id="threadCommentsCount" class="flex items-center"><i class="fas fa-comment mr-1"></i> Loading...</span>
+                                <span id="threadDate" class="flex items-center"><i class="fas fa-calendar-alt mr-1"></i> Loading...</span>
+                            </div>
+                            <div id="threadText" class="prose max-w-none text-gray-700 mt-2"></div>
+                            <div id="threadMedia" class="mt-4"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            <i class="fas fa-comments mr-2 text-blue-500"></i>
+                            Comments <span id="commentCountHeader" class="text-blue-600">(Loading...)</span>
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <label for="sortComments" class="text-sm text-gray-600">Sort by:</label>
+                            <select id="sortComments" class="text-sm border border-gray-300 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="confidence">Best</option> <option value="top">Top</option>
+                                <option value="new">New</option>
+                                <option value="old">Old</option>
+                                <option value="controversial">Controversial</option>
+                                <option value="qa">Q&A</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="commentsContainer">
+                        <div class="text-center py-8">
+                            <div class="inline-block loader"></div>
+                            <p class="mt-2 text-gray-600">Loading comments...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="messageArea" class="mt-6"></div>
+
+            <div id="errorSection" class="hidden bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded fade-in">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500 mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800" id="errorTitle">Error</h3>
+                        <div class="mt-2 text-sm text-red-700" id="errorMessage">
+                            <p>An error occurred. Please check your input and try again.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>Reddit Search & Explorer &copy; <span id="currentYear"></span> | Not affiliated with Reddit</p>
+            <p class="mt-1">Using Reddit API via OAuth 2.0</p>
+        </footer>
+    </div>
+
+    <script>
+        // API credentials - IMPORTANT: Keep these secure in a real application!
+        // For a client-side app like this, using client_credentials grant is standard,
+        // but be aware of rate limits and potential exposure if abused.
+        const CLIENT_ID = 'GuixM5R4H8A7Xiyo01FueA'; // Replace with your actual Client ID if needed
+        const CLIENT_SECRET = 'kzE9ChaZy3bgIEvDdBRwxPEezqVB-A'; // Replace with your actual Client Secret if needed
+
+        // Global variables
+        let accessToken = null;
+        let currentThreadData = null; // Stores data for the currently viewed thread (for export)
+        let currentSort = 'confidence'; // Default comment sort
+        let currentThreadId = null; // Store the ID of the thread being viewed
+
+        // DOM elements
+        const searchForm = document.getElementById('searchForm');
+        const searchInput = document.getElementById('searchInput'); // Changed ID
+        const searchButton = document.getElementById('searchButton');
+        const buttonText = document.getElementById('buttonText');
+        const buttonLoader = document.getElementById('buttonLoader');
+        const searchResultsSection = document.getElementById('searchResultsSection');
+        const searchResultsList = document.getElementById('searchResultsList');
+        const threadDetailsSection = document.getElementById('threadDetailsSection');
+        const backToSearchButton = document.getElementById('backToSearchButton');
+        const errorSection = document.getElementById('errorSection');
+        const errorMessage = document.getElementById('errorMessage');
+        const messageArea = document.getElementById('messageArea');
+        const exportJsonButton = document.getElementById('exportJsonButton');
+        const currentYear = document.getElementById('currentYear');
+
+        // Thread elements
+        const threadTitle = document.getElementById('threadTitle');
+        const threadAuthor = document.getElementById('threadAuthor');
+        const threadSubreddit = document.getElementById('threadSubreddit');
+        const threadScore = document.getElementById('threadScore');
+        const threadCommentsCount = document.getElementById('threadCommentsCount'); // Renamed for clarity
+        const threadDate = document.getElementById('threadDate');
+        const threadText = document.getElementById('threadText');
+        const threadThumbnail = document.getElementById('threadThumbnail');
+        const threadMedia = document.getElementById('threadMedia');
+        const commentCountHeader = document.getElementById('commentCountHeader'); // Renamed for clarity
+        const commentsContainer = document.getElementById('commentsContainer');
+        const sortComments = document.getElementById('sortComments');
+
+        // --- Event listeners ---
+        searchForm.addEventListener('submit', handleFormSubmit);
+        sortComments.addEventListener('change', handleSortChange);
+        exportJsonButton.addEventListener('click', handleExportJson);
+        backToSearchButton.addEventListener('click', () => {
+            threadDetailsSection.classList.add('hidden');
+            searchResultsSection.classList.remove('hidden');
+            clearThreadDetails(); // Clear out old thread data
+            currentThreadData = null; // Reset export data
+            currentThreadId = null;
+        });
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            getAccessToken();
+            currentYear.textContent = new Date().getFullYear();
+        });
+
+        // --- Core Functions ---
+
+        // Form submission handler (Handles both search and URL extraction)
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            clearNotifications(); // Clear previous errors/messages
+            const queryOrUrl = searchInput.value.trim();
+            if (!queryOrUrl) return; // Do nothing if input is empty
+
+            setLoadingState(true, 'Searching...');
+
+            try {
+                // Check if it's a Reddit URL
+                const potentialThreadId = extractThreadId(queryOrUrl);
+
+                if (potentialThreadId) {
+                    // It's a URL, fetch the specific thread
+                    currentThreadId = potentialThreadId;
+                    const data = await fetchThreadData(currentThreadId, currentSort);
+                    currentThreadData = data; // Store for export
+                    displayThreadData(data);
+                    searchResultsSection.classList.add('hidden'); // Hide search results
+                    threadDetailsSection.classList.remove('hidden'); // Show thread details
+                    backToSearchButton.classList.add('hidden'); // Hide back button when coming directly from URL
+                } else {
+                    // It's a search query
+                    const results = await fetchSearchResults(queryOrUrl);
+                    displaySearchResults(results);
+                    threadDetailsSection.classList.add('hidden'); // Hide thread details
+                    searchResultsSection.classList.remove('hidden'); // Show search results
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'An error occurred. Please check your input or network connection.');
+                searchResultsSection.classList.add('hidden');
+                threadDetailsSection.classList.add('hidden');
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // Fetch search results from Reddit API
+        async function fetchSearchResults(query) {
+            await ensureAccessToken(); // Make sure we have a token
+
+            const response = await fetch(`https://oauth.reddit.com/search.json?q=${encodeURIComponent(query)}&limit=25&sort=relevance&t=all`, { // Example: limit 25, sort by relevance, all time
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'User-Agent': 'RedditSearchExplorer/1.0 by ChrisCombsDev (change if needed)' // Be descriptive
+                }
+            });
+
+            if (!response.ok) {
+                 const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+                 console.error("Search API Error:", response.status, errorData);
+                 throw new Error(`Failed to fetch search results (${response.status}). ${errorData.message || ''}`);
+            }
+            return await response.json();
+        }
+
+        // Display search results list
+        function displaySearchResults(results) {
+            searchResultsList.innerHTML = ''; // Clear previous results
+
+            if (!results || !results.data || !results.data.children || results.data.children.length === 0) {
+                searchResultsList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-search text-3xl mb-2"></i>
+                        <p>No threads found for your search query.</p>
+                    </div>`;
+                return;
+            }
+
+            results.data.children.forEach(item => {
+                if (item.kind !== 't3') return; // Ensure it's a Link/Post (t3)
+
+                const post = item.data;
+                const resultEl = document.createElement('div');
+                resultEl.className = 'search-result-item border border-gray-200 p-4 rounded-lg cursor-pointer flex gap-4 items-start';
+                resultEl.dataset.threadId = post.id; // Store thread ID for click handling
+
+                 // Thumbnail
+                const thumbContainer = document.createElement('div');
+                thumbContainer.className = 'flex-shrink-0 w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden';
+                if (post.thumbnail && post.thumbnail.startsWith('http')) {
+                    thumbContainer.innerHTML = `<img src="${post.thumbnail}" alt="Thumbnail" class="w-full h-full object-cover">`;
+                } else if (isImageUrl(post.url)) { // Check if the main URL is an image for posts without specific thumbnails
+                     thumbContainer.innerHTML = `<img src="${post.url}" alt="Thumbnail" class="w-full h-full object-cover">`;
+                }
+                 else {
+                    thumbContainer.innerHTML = `<i class="fas fa-align-left text-gray-400 text-xl"></i>`; // Default icon
+                }
+                resultEl.appendChild(thumbContainer);
+
+                // Main Content
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'flex-grow';
+
+                // Title
+                const titleEl = document.createElement('h3');
+                titleEl.className = 'text-lg font-semibold text-blue-700 hover:underline mb-1';
+                titleEl.textContent = post.title;
+                contentDiv.appendChild(titleEl);
+
+                // Metadata (Subreddit, Author, Score, Comments, Date)
+                const metaEl = document.createElement('div');
+                metaEl.className = 'flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500';
+                metaEl.innerHTML = `
+                    <span class="whitespace-nowrap"><i class="fas fa-users mr-1"></i>r/${post.subreddit}</span>
+                    <span class="whitespace-nowrap"><i class="fas fa-user mr-1"></i>u/${post.author}</span>
+                    <span class="whitespace-nowrap"><i class="fas fa-arrow-up mr-1"></i>${formatNumber(post.score)}</span>
+                    <span class="whitespace-nowrap"><i class="fas fa-comment mr-1"></i>${formatNumber(post.num_comments)} comments</span>
+                    <span class="whitespace-nowrap"><i class="fas fa-calendar-alt mr-1"></i>${formatDate(post.created_utc)}</span>
+                `;
+                contentDiv.appendChild(metaEl);
+
+                resultEl.appendChild(contentDiv);
+
+                // Add click listener to load the thread
+                resultEl.addEventListener('click', async () => {
+                    const threadId = resultEl.dataset.threadId;
+                    if (!threadId) return;
+
+                    clearNotifications();
+                    setLoadingState(true, 'Loading thread...'); // Show loading specifically for thread fetch
+                    searchResultsSection.classList.add('hidden'); // Hide search results
+                     backToSearchButton.classList.remove('hidden'); // Ensure back button is visible
+
+                    try {
+                        currentThreadId = threadId; // Set current thread ID
+                        const data = await fetchThreadData(threadId, currentSort); // Fetch with default sort
+                        currentThreadData = data; // Store for export
+                        displayThreadData(data);
+                        threadDetailsSection.classList.remove('hidden'); // Show thread view
+                    } catch (error) {
+                        console.error("Error loading thread from search:", error);
+                        showError(`Failed to load thread: ${error.message}`);
+                        threadDetailsSection.classList.add('hidden'); // Hide potentially broken view
+                        searchResultsSection.classList.remove('hidden'); // Show search results again
+                    } finally {
+                       setLoadingState(false); // Hide general loading indicator
+                    }
+                });
+
+                searchResultsList.appendChild(resultEl);
+            });
+        }
+
+        // Fetch specific thread data (including comments)
+        async function fetchThreadData(threadId, sort = 'confidence') {
+            await ensureAccessToken();
+
+             // Reset comment sort dropdown to the requested/default sort
+             sortComments.value = sort;
+             currentSort = sort; // Update global sort state
+
+            const response = await fetch(`https://oauth.reddit.com/comments/${threadId}?limit=500&depth=10&sort=${sort}`, { // Increased depth, added sort
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'User-Agent': 'RedditSearchExplorer/1.0 by ChrisCombsDev'
+                }
+            });
+
+            if (!response.ok) {
+                 const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+                 console.error("Thread Fetch API Error:", response.status, errorData);
+                 throw new Error(`Failed to fetch thread data (${response.status}). ${errorData.message || 'Maybe the URL is invalid or the thread was removed.'}`);
+            }
+            return await response.json();
+        }
+
+         // Display the data for a single thread
+        function displayThreadData(data) {
+            clearThreadDetails(); // Clear previous data first
+
+            if (!data || data.length < 2 || !data[0]?.data?.children?.[0]?.data) {
+                 showError("Invalid thread data received from API.");
+                 threadDetailsSection.classList.add('hidden');
+                 return;
+            }
+            // The first item is the post itself
+            const postData = data[0].data.children[0].data;
+
+            // Set thread information
+            threadTitle.textContent = postData.title || '[No Title]';
+            threadAuthor.innerHTML = `<i class="fas fa-user mr-1"></i> u/${postData.author || '[deleted]'}`;
+            threadSubreddit.innerHTML = `<i class="fas fa-users mr-1"></i> r/${postData.subreddit || '[unknown]'}`;
+            threadScore.innerHTML = `<i class="fas fa-arrow-up mr-1"></i> ${formatNumber(postData.score)}`;
+            threadCommentsCount.innerHTML = `<i class="fas fa-comment mr-1"></i> ${formatNumber(postData.num_comments)} comments`;
+            threadDate.innerHTML = `<i class="fas fa-calendar-alt mr-1"></i> ${formatDate(postData.created_utc)}`;
+            commentCountHeader.textContent = `(${formatNumber(postData.num_comments)})`; // Update comment section header too
+
+            // Set thread text (selftext) - Handle potential HTML entities
+            if (postData.selftext) {
+                threadText.innerHTML = formatRedditText(decodeHtmlEntities(postData.selftext_html || postData.selftext)); // Prefer selftext_html if available
+            } else if (!postData.is_self && postData.url) {
+                 threadText.innerHTML = ''; // Clear text area for link/media posts
+            }
+            else {
+                threadText.innerHTML = '<p class="text-gray-500 italic">No text content for this post.</p>';
+            }
+
+            // Set thumbnail
+            threadThumbnail.innerHTML = '<i class="fas fa-image text-gray-400 text-xl"></i>'; // Default icon
+            if (postData.thumbnail && postData.thumbnail.startsWith('http')) {
+                threadThumbnail.innerHTML = `<img src="${postData.thumbnail}" alt="Post thumbnail" class="w-full h-full object-cover">`;
+            } else if (isImageUrl(postData.url) && !postData.is_self) {
+                 threadThumbnail.innerHTML = `<img src="${postData.url}" alt="Post image" class="w-full h-full object-cover">`;
+            }
+
+            // Handle media (images, videos, links)
+            threadMedia.innerHTML = '';
+            if (postData.is_video && postData.media?.reddit_video) {
+                // Handle Reddit video posts
+                const videoContainer = document.createElement('div');
+                videoContainer.className = 'mt-4 rounded-lg overflow-hidden border border-gray-200';
+                const video = document.createElement('video');
+                video.src = postData.media.reddit_video.fallback_url;
+                video.controls = true;
+                video.className = 'w-full max-h-96 block'; // Use max-h for large videos
+                videoContainer.appendChild(video);
+                threadMedia.appendChild(videoContainer);
+            } else if (postData.preview?.images?.[0]?.source?.url && !postData.is_self) {
+                 // Handle direct image posts often found in preview data
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'mt-4';
+                 const img = document.createElement('img');
+                 img.src = decodeHtmlEntities(postData.preview.images[0].source.url);
+                 img.alt = postData.title || 'Post image';
+                 img.className = 'max-w-full h-auto rounded-lg mx-auto border border-gray-200'; // Center image
+                 imgContainer.appendChild(img);
+                 threadMedia.appendChild(imgContainer);
+            }
+             else if (postData.url && !postData.is_self && !isImageUrl(postData.url) && !postData.media?.reddit_video) {
+                // Handle other link posts (non-image, non-video)
+                const linkContainer = document.createElement('div');
+                linkContainer.className = 'mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200';
+                const link = document.createElement('a');
+                link.href = postData.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer nofollow'; // Added nofollow
+                link.className = 'text-blue-600 hover:underline flex items-center break-all'; // Allow long URLs to break
+                link.innerHTML = `<i class="fas fa-external-link-alt mr-2 flex-shrink-0"></i> ${postData.url}`;
+                linkContainer.appendChild(link);
+                threadMedia.appendChild(linkContainer);
+            }
+
+            // Display comments (second item in the data array)
+            displayComments(data[1]); // Pass the comment listing
+        }
+
+        // Display comments for the current thread
+        function displayComments(commentsData) {
+            commentsContainer.innerHTML = ''; // Clear previous comments
+
+            if (!commentsData || !commentsData.data || !commentsData.data.children || commentsData.data.children.length === 0) {
+                commentsContainer.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-comment-slash text-3xl mb-2"></i>
+                        <p>No comments found or comments failed to load.</p>
+                    </div>`;
+                return;
+            }
+
+            // Process each top-level item (can be comment 't1' or 'more' object)
+            commentsData.data.children.forEach(item => {
+                if (item.kind === 't1') { // t1 is a comment
+                    renderComment(item.data, 0);
+                } else if (item.kind === 'more') {
+                    // TODO: Optionally implement "load more comments" functionality
+                     renderLoadMore(item.data, 0);
+                }
+            });
+        }
+
+        // Render a single comment (recursive for replies)
+        function renderComment(comment, level) {
+             // Basic check for valid comment structure
+             if (!comment || typeof comment.author === 'undefined' || typeof comment.body_html === 'undefined') {
+                 console.warn("Skipping invalid comment object:", comment);
+                 return;
+             }
+
+            // Skip removed/deleted comments explicitly
+            if (comment.author === '[deleted]' || comment.body === '[removed]' || comment.body_html === '[removed]') {
+                 // Optionally render a placeholder for removed comments
+                 const removedEl = document.createElement('div');
+                 removedEl.className = `comment-level-${level} mb-4 p-2 text-sm text-gray-400 italic fade-in`;
+                 removedEl.textContent = '[comment removed]';
+                 commentsContainer.appendChild(removedEl);
+                return;
+            }
+
+            // Create comment element
+            const commentEl = document.createElement('div');
+             // Use border for visual nesting instead of just margin
+            commentEl.className = `comment-level-${level} mb-4 pt-2 fade-in`;
+
+            // Comment header (author, score, time)
+            const header = document.createElement('div');
+            header.className = 'flex items-center text-sm text-gray-500 mb-1 flex-wrap gap-x-2';
+
+             const authorLink = document.createElement('a');
+             authorLink.href = `https://www.reddit.com/u/${comment.author}`;
+             authorLink.target = "_blank";
+             authorLink.rel = "noopener noreferrer";
+             authorLink.className = 'font-medium text-gray-700 hover:underline';
+             authorLink.textContent = comment.author;
+             header.appendChild(authorLink);
+
+             // Flair (if available)
+            if (comment.author_flair_text) {
+                 const flair = document.createElement('span');
+                 flair.className = 'text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded';
+                 flair.textContent = decodeHtmlEntities(comment.author_flair_text);
+                 flair.title = "User Flair";
+                 header.appendChild(flair);
+             }
+
+            const score = document.createElement('span');
+            score.className = 'whitespace-nowrap';
+            score.title = `${comment.score} points`;
+            score.innerHTML = `<i class="fas fa-arrow-up text-xs mr-1"></i>${formatNumber(comment.score)}`;
+            header.appendChild(score);
+
+            const time = document.createElement('span');
+             time.className = 'whitespace-nowrap';
+            time.innerHTML = `<i class="far fa-clock mr-1"></i>${formatDate(comment.created_utc)}`;
+            header.appendChild(time);
+
+            commentEl.appendChild(header);
+
+            // Comment body - Use body_html provided by Reddit for proper formatting
+            const body = document.createElement('div');
+            body.className = 'prose prose-sm max-w-none text-gray-800 mb-2'; // Use prose-sm for smaller comment text
+            // Sanitize HTML before inserting (Basic example - consider a more robust library like DOMPurify in production)
+            body.innerHTML = sanitizeHtml(decodeHtmlEntities(comment.body_html));
+            commentEl.appendChild(body);
+
+            // Comment actions (mockup/placeholders)
+            const actions = document.createElement('div');
+            actions.className = 'flex space-x-4 text-xs text-gray-500';
+            actions.innerHTML = `
+                <button class="hover:text-blue-600 flex items-center" title="Reply (not implemented)"><i class="fas fa-reply mr-1"></i> Reply</button>
+                <button class="hover:text-blue-600 flex items-center" title="Share (not implemented)"><i class="fas fa-share mr-1"></i> Share</button>
+                <a href="https://www.reddit.com${comment.permalink}" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 flex items-center" title="View on Reddit"><i class="fab fa-reddit-alien mr-1"></i> Permalink</a>
+            `;
+            commentEl.appendChild(actions);
+
+             // Container for replies, makes nesting visually clearer
+             const repliesContainer = document.createElement('div');
+             repliesContainer.className = 'mt-3'; // Add some space before replies start
+             commentEl.appendChild(repliesContainer);
+
+            // Append the whole comment element to the main container OR the parent's reply container
+             const parentContainer = level > 0 ? document.querySelector(`.comment-level-${level-1}:last-child > div:last-child`) : commentsContainer;
+            parentContainer.appendChild(commentEl);
+
+
+            // Recursively render replies if they exist
+            if (comment.replies && comment.replies.kind === 'Listing' && comment.replies.data && comment.replies.data.children) {
+                comment.replies.data.children.forEach(reply => {
+                    if (reply.kind === 't1') {
+                        renderComment(reply.data, level + 1);
+                    } else if (reply.kind === 'more') {
+                         renderLoadMore(reply.data, level + 1);
+                    }
+                });
+            }
+        }
+
+         // Render 'load more comments' placeholder
+         function renderLoadMore(moreData, level) {
+             const moreEl = document.createElement('div');
+             moreEl.className = `comment-level-${level} my-2`; // Use 'my-2' for vertical spacing
+
+             const button = document.createElement('button');
+             button.className = 'text-sm text-blue-600 hover:underline px-1 py-0.5';
+             button.textContent = `Load more comments (${moreData.count})`;
+             button.title = 'Loading more comments is not implemented in this demo';
+             // TODO: Add event listener here to actually fetch more comments using the IDs in moreData.children if implementing this feature.
+              button.disabled = true; // Disable for now
+
+              moreEl.appendChild(button);
+
+              // Append to the correct container
+             const parentContainer = level > 0 ? document.querySelector(`.comment-level-${level-1}:last-child > div:last-child`) : commentsContainer;
+             parentContainer.appendChild(moreEl);
+         }
+
+
+        // --- Utility Functions ---
+
+        // Basic HTML Sanitizer (replace with a library like DOMPurify for production)
+         function sanitizeHtml(htmlString) {
+             const allowedTags = ['p', 'br', 'a', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr'];
+             const tempDiv = document.createElement('div');
+             tempDiv.innerHTML = htmlString;
+
+             // Remove disallowed tags and attributes (very basic)
+             tempDiv.querySelectorAll('*').forEach(el => {
+                 if (!allowedTags.includes(el.tagName.toLowerCase())) {
+                     el.parentNode.removeChild(el);
+                 } else {
+                     // Allow only href for <a> tags
+                     if (el.tagName.toLowerCase() === 'a') {
+                         const allowedAttrs = ['href', 'target', 'rel', 'title'];
+                         for (const attr of [...el.attributes]) {
+                             if (!allowedAttrs.includes(attr.name)) {
+                                 el.removeAttribute(attr.name);
+                             }
+                         }
+                         // Ensure links open in new tabs and are safe
+                         el.target = '_blank';
+                         el.rel = 'noopener noreferrer nofollow';
+                     } else {
+                        // Remove all attributes from other allowed tags for simplicity
+                         for (const attr of [...el.attributes]) {
+                             el.removeAttribute(attr.name);
+                         }
+                     }
+                 }
+             });
+
+             return tempDiv.innerHTML;
+         }
+
+         // Decode HTML entities
+         function decodeHtmlEntities(text) {
+             if (!text) return '';
+             const textarea = document.createElement('textarea');
+             textarea.innerHTML = text;
+             return textarea.value;
+         }
+
+         // Extract thread ID from a potential Reddit URL
+         function extractThreadId(url) {
+             try {
+                 // Strict regex to match Reddit comment URLs
+                 const match = url.match(/reddit\.com\/r\/[a-zA-Z0-9_]+\/comments\/([a-zA-Z0-9]+)(?:\/|$)/);
+                 if (match && match[1]) {
+                     return match[1];
+                 }
+                 return null;
+             } catch {
+                 return null; // If URL parsing fails or it's not a valid URL pattern
+             }
+         }
+
+        // Get OAuth access token
+        async function getAccessToken() {
+            // Check if token exists and hasn't expired (basic check)
+            // In a real app, you'd store the expiry time and check it.
+            if (accessToken) return;
+
+            try {
+                 // Use btoa for Basic Auth header encoding
+                 const credentials = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
+
+                const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Authorization': `Basic ${credentials}`
+                    },
+                    body: 'grant_type=client_credentials&scope=*' // Request broad scope if needed, or specify (e.g., 'read')
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    console.error("Token Fetch Error:", response.status, errorData);
+                    throw new Error(`Failed to get access token (${response.status}). Check Client ID/Secret.`);
+                }
+
+                const data = await response.json();
+                accessToken = data.access_token;
+                 console.log("Access token obtained successfully.");
+                 // You could also store data.expires_in here to manage token lifetime
+            } catch (error) {
+                console.error('Error getting access token:', error);
+                showError(`Authentication Error: ${error.message}. The application might not work correctly.`);
+                accessToken = null; // Ensure token is null on failure
+                 throw error; // Re-throw to indicate failure
+            }
+        }
+
+         // Helper to ensure token exists before API calls
+         async function ensureAccessToken() {
+             if (!accessToken) {
+                 console.log("Access token not found, attempting to fetch...");
+                 await getAccessToken(); // This will throw if it fails
+                 if (!accessToken) { // Double check after attempt
+                     throw new Error('Authentication failed, cannot proceed.');
+                 }
+             }
+         }
+
+        // Handle comment sort change
+         async function handleSortChange() {
+             const newSort = sortComments.value;
+             if (!currentThreadId || newSort === currentSort) {
+                  return; // No thread loaded or sort didn't actually change
+             }
+
+             currentSort = newSort;
+             console.log(`Re-fetching comments for thread ${currentThreadId} with sort: ${currentSort}`);
+
+             // Show loading state specifically for comments
+             commentsContainer.innerHTML = `
+                 <div class="text-center py-8">
+                     <div class="inline-block loader"></div>
+                     <p class="mt-2 text-gray-600">Loading comments (sorted by ${currentSort})...</p>
+                 </div>`;
+             clearNotifications(); // Clear errors before re-fetch
+
+             try {
+                  const data = await fetchThreadData(currentThreadId, currentSort);
+                  currentThreadData = data; // Update stored data as comments have changed
+                  // Only update the comments part, keep thread info the same
+                  if (data && data.length > 1) {
+                       displayComments(data[1]);
+                  } else {
+                        throw new Error("Invalid data structure received after sorting.");
+                  }
+             } catch (error) {
+                  console.error("Error re-fetching sorted comments:", error);
+                  showError(`Failed to load sorted comments: ${error.message}`);
+                   // Optionally keep old comments or show a specific error in the comments container
+                   commentsContainer.innerHTML = `<div class="text-center py-8 text-red-600">Error loading comments. Please try again.</div>`;
+             }
+         }
+
+
+        // Export current thread data as JSON
+        function handleExportJson() {
+            if (!currentThreadData || !currentThreadId) {
+                 showError('No thread data loaded to export. Please load a thread first by searching or entering a URL.');
+                return;
+            }
+
+            try {
+                const exportData = prepareExportData(currentThreadData);
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                // Try to get a meaningful filename
+                const filename = `reddit-${exportData.post?.subreddit || 'thread'}-${exportData.post?.id || currentThreadId}.json`;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showMessage('JSON export started successfully.');
+                }, 100);
+
+            } catch (error) {
+                console.error('Error exporting JSON:', error);
+                showError('Failed to prepare or initiate JSON export.');
+            }
+        }
+
+        // Prepare data structure for JSON export
+        function prepareExportData(data) {
+            const postData = data[0].data.children[0].data;
+            const comments = processCommentsForExport(data[1]);
+
+            return {
+                metadata: {
+                    exportedAt: new Date().toISOString(),
+                    source: "Reddit Search & Explorer",
+                    version: "1.1", // Update version if structure changes
+                    threadUrl: `https://www.reddit.com${postData.permalink}`,
+                     commentSort: currentSort
+                },
+                post: {
+                    id: postData.id,
+                    title: postData.title,
+                    author: postData.author,
+                    subreddit: postData.subreddit,
+                    score: postData.score,
+                    upvote_ratio: postData.upvote_ratio,
+                    num_comments: postData.num_comments,
+                    created_utc: postData.created_utc,
+                    selftext: postData.selftext,
+                    selftext_html: postData.selftext_html, // Include HTML version
+                    url: postData.url, // Link URL or post URL
+                    permalink: postData.permalink,
+                    is_self: postData.is_self,
+                    is_video: postData.is_video,
+                    thumbnail: postData.thumbnail,
+                    media: postData.media, // Includes video details if present
+                    preview: postData.preview // Includes image details
+                },
+                comments: comments, // Array of comment objects
+                 fetched_comment_count: comments.length // Could be less than post.num_comments due to API limits/depth
+            };
+        }
+
+        // Recursively process comments for clean export structure
+        function processCommentsForExport(commentsListing) {
+            if (!commentsListing || commentsListing.kind !== 'Listing' || !commentsListing.data || !commentsListing.data.children) {
+                return [];
+            }
+
+            return commentsListing.data.children
+                .map(item => {
+                    if (item.kind === 't1') { // Process comments
+                        const comment = item.data;
+                        return {
+                            id: comment.id,
+                            author: comment.author,
+                            body: comment.body,
+                            body_html: comment.body_html,
+                            score: comment.score,
+                            created_utc: comment.created_utc,
+                            depth: comment.depth,
+                            permalink: comment.permalink,
+                            replies: comment.replies ? processCommentsForExport(comment.replies) : [] // Recurse
+                        };
+                    } else if (item.kind === 'more') { // Represent 'more' objects if needed
+                         return {
+                             kind: 'more',
+                             count: item.data.count,
+                             ids: item.data.children // List of comment IDs to fetch
+                         };
+                    }
+                    return null; // Skip other kinds
+                })
+                 .filter(comment => comment !== null); // Remove null entries
+        }
+
+        // Format large numbers (1,000 => 1.0k, 1,234,000 => 1.2M)
+        function formatNumber(num) {
+             if (typeof num !== 'number') return num; // Return as is if not a number
+             if (Math.abs(num) >= 1000000) {
+                 return (num / 1000000).toFixed(1) + 'M';
+             } else if (Math.abs(num) >= 1000) {
+                 return (num / 1000).toFixed(1) + 'k';
+             }
+             return num.toString();
+         }
+
+         // Format Unix timestamp to a relative or absolute time string
+         function formatDate(timestamp) {
+             const date = new Date(timestamp * 1000);
+             const now = new Date();
+             const diffSeconds = Math.round((now - date) / 1000);
+             const diffMinutes = Math.round(diffSeconds / 60);
+             const diffHours = Math.round(diffMinutes / 60);
+             const diffDays = Math.round(diffHours / 24);
+             const diffWeeks = Math.round(diffDays / 7);
+             const diffMonths = Math.round(diffDays / 30.44); // Average days in month
+             const diffYears = Math.round(diffDays / 365.25);
+
+             if (diffSeconds < 60) return `${diffSeconds}s ago`;
+             if (diffMinutes < 60) return `${diffMinutes}m ago`;
+             if (diffHours < 24) return `${diffHours}h ago`;
+             if (diffDays < 7) return `${diffDays}d ago`;
+             if (diffWeeks < 5) return `${diffWeeks}w ago`; // Up to 4 weeks
+             // For older dates, show Month Day, Year
+             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+         }
+
+        // Check if URL likely points to an image file
+        function isImageUrl(url) {
+            if (!url) return false;
+            try {
+                // Check file extension
+                if (/\.(jpg|jpeg|png|gif|webp|avif)$/i.test(url)) return true;
+                // Check some common image hosting domain patterns (simplified)
+                 if (/i\.redd\.it|i\.imgur\.com/.test(url)) return true;
+            } catch (e) { /* Ignore errors from invalid URLs */ }
+            return false;
+        }
+
+         // Clear out dynamic content from the thread details view
+         function clearThreadDetails() {
+              threadTitle.textContent = 'Loading...';
+              threadAuthor.innerHTML = '<i class="fas fa-user mr-1"></i> Loading...';
+              threadSubreddit.innerHTML = '<i class="fas fa-users mr-1"></i> Loading...';
+              threadScore.innerHTML = '<i class="fas fa-arrow-up mr-1"></i> Loading...';
+              threadCommentsCount.innerHTML = '<i class="fas fa-comment mr-1"></i> Loading...';
+              threadDate.innerHTML = '<i class="fas fa-calendar-alt mr-1"></i> Loading...';
+              commentCountHeader.textContent = '(Loading...)';
+              threadText.innerHTML = '';
+              threadMedia.innerHTML = '';
+              threadThumbnail.innerHTML = '<i class="fas fa-image text-gray-400 text-xl"></i>';
+              commentsContainer.innerHTML = '<div class="text-center py-8"><div class="inline-block loader"></div><p class="mt-2 text-gray-600">Loading comments...</p></div>';
+         }
+
+         // Set loading state for the main button
+         function setLoadingState(isLoading, text = 'Search / Extract') {
+             if (isLoading) {
+                 buttonText.textContent = text;
+                 buttonLoader.classList.remove('hidden');
+                 searchButton.disabled = true;
+                 searchInput.disabled = true;
+             } else {
+                 buttonText.textContent = 'Search / Extract'; // Reset text
+                 buttonLoader.classList.add('hidden');
+                 searchButton.disabled = false;
+                 searchInput.disabled = false;
+             }
+         }
+
+         // Clear error and message notifications
+         function clearNotifications() {
+             errorSection.classList.add('hidden');
+             messageArea.innerHTML = ''; // Clear custom messages
+         }
+
+        // Show error message banner
+        function showError(message) {
+            errorMessage.innerHTML = `<p>${message}</p>`;
+            errorSection.classList.remove('hidden');
+             messageArea.innerHTML = ''; // Clear normal messages if error occurs
+        }
+
+        // Show informational message (used for export success, etc.)
+        function showMessage(message, type = 'info') {
+             clearNotifications(); // Clear previous messages/errors first
+             const messageEl = document.createElement('div');
+             let bgColor, borderColor, textColor, iconClass, iconColor;
+
+             switch(type) {
+                 case 'success':
+                     bgColor = 'bg-green-50'; borderColor = 'border-green-500'; textColor = 'text-green-700'; iconClass = 'fas fa-check-circle'; iconColor = 'text-green-500';
+                     break;
+                 case 'warning':
+                      bgColor = 'bg-yellow-50'; borderColor = 'border-yellow-500'; textColor = 'text-yellow-700'; iconClass = 'fas fa-exclamation-triangle'; iconColor = 'text-yellow-500';
+                     break;
+                 default: // info
+                      bgColor = 'bg-blue-50'; borderColor = 'border-blue-500'; textColor = 'text-blue-700'; iconClass = 'fas fa-info-circle'; iconColor = 'text-blue-500';
+             }
+
+             messageEl.className = `${bgColor} border-l-4 ${borderColor} p-4 rounded fade-in`;
+             messageEl.innerHTML = `
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="${iconClass} ${iconColor} mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm ${textColor}">${message}</p>
+                    </div>
+                </div>
+            `;
+            messageArea.appendChild(messageEl);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (messageEl.parentNode === messageArea) { // Check if it hasn't been cleared already
+                     messageEl.style.transition = 'opacity 0.3s ease-out';
+                     messageEl.style.opacity = '0';
+                     setTimeout(() => messageEl.remove(), 300);
+                 }
+            }, 5000);
+        }
+
+    </script>
+</body>
+</html>
